@@ -13,7 +13,7 @@ with engine.connect() as conn:
         data = genfromtxt(file_name, delimiter=';', dtype=None, skip_header=0, encoding="utf8")
         return data.tolist()
 
-    def get_headrs(tbl):
+    def get_headrs(tbl): #Достаём заголовки стаблиц
         return list(conn.execute(select(tbl)).keys())
 
 
@@ -24,7 +24,6 @@ with engine.connect() as conn:
             return t
 
     def getID(t_name): # Добывает идентификатор из выбранной таблицы
-
         stmt = select(func.max(t_name.id))
         answ = conn.execute(stmt)
         if answ == None:
@@ -34,7 +33,7 @@ with engine.connect() as conn:
 
 
 
-    #def group_ins(data): # Вставка информации в таблицу
+    #def group_ins(data): # Легаси вставка на всякий
     #    sID = getID(Study_group)
     #    for i in data:
     #        sID += 1
@@ -44,7 +43,7 @@ with engine.connect() as conn:
     #    stmt = select(Study_group)
     #    print("voila")
 
-    def create_expr(tbl, data):
+    def create_expr(tbl, data): # создаём список данных, которые подлежат вставке. вход БЕЗ АЙДИШНИКА
         hdrs = get_headrs(tbl)
         res = []
         j = 1
@@ -52,11 +51,11 @@ with engine.connect() as conn:
             lst = {}
             i = -1
             for hdr in hdrs:
-                if hdr == "id":
+                if hdr == "id": # присваиваем айдишник
                     i+=1
                     lst["id"] = getID(tbl) + (j)
                     continue
-                elif hdr=="start_time" or hdr == "end_time":
+                elif hdr=="start_time" or hdr == "end_time": # Чиним пустые поля со временем
                     row[i] = get_time_right(row[i])
                 lst[hdr] = row[i]
                 i+=1
@@ -65,7 +64,7 @@ with engine.connect() as conn:
         return res
 
 
-    def insert_into(tbl, data):
+    def insert_into(tbl, data): # Главная функция вставки
         expr = conn.execute(
             insert(tbl),
             create_expr(tbl, data)
@@ -73,7 +72,7 @@ with engine.connect() as conn:
         conn.commit()
 
 
-    #dat = [['Иванов Иван Иванович', '@3poIVA', 10], ["Петров Пётр Петрович", '@PetyaTretyi', 6]]
+    #dat = [['Иванов Иван Иванович', '@3poIVA', 10], ["Петров Пётр Петрович", '@PetyaTretyi', 6]] #тест
     #datt = [[3,18], [4, 17]]
     #insert_into(Group_stud, datt)
 
@@ -87,7 +86,7 @@ with engine.connect() as conn:
 
     give_sch("Петров Пётр Петрович")
 
-    #imp = Load_Data("schedule1.csv") #реализация вставки в таблицу
+    #imp = Load_Data("schedule1.csv") #реализация вставки из файла в таблицу
     #for i in imp:
     #    print(i)
     #print(len(imp))

@@ -6,12 +6,12 @@ from sqlalchemy import String, engine, ForeignKey, create_engine
 from sqlalchemy.orm import  DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
 from datetime import time
 
-import psycopg2
+#import psycopg2
 
-uName = "postgres"
-pWord = "Dum_D4k"
-
-engine = create_engine(f'postgresql+psycopg2://{uName}:{pWord}@localhost/SER_Tyuiu')
+#uName = "postgres"
+#pWord = "Dum_D4k"
+#
+#engine = create_engine(f'postgresql+psycopg2://{uName}:{pWord}@localhost/SER_Tyuiu')
 
 #Session = sessionmaker(bind=engine)
 #session = Session()

@@ -7,10 +7,10 @@ uName = "postgres"
 pWord = "Dum_D4k"
 
 engine = create_engine(f'postgresql+psycopg2://{uName}:{pWord}@localhost/SER_Tyuiu')
-
-BOT_TOKEN = "5702307330:AAF8x24G11wLONho88uHmsXzg0aYvdp0vzM"
-bot = telebot.TeleBot(BOT_TOKEN)
 with engine.connect() as conn:
+
+    BOT_TOKEN = "5702307330:AAF8x24G11wLONho88uHmsXzg0aYvdp0vzM"
+    bot = telebot.TeleBot(BOT_TOKEN)
     @bot.message_handler(commands=['start'])
     def start(message):
         bot.reply_to(message, (
@@ -52,3 +52,4 @@ with engine.connect() as conn:
 
     print("Бот запущен...")
     bot.infinity_polling()
+conn.close()

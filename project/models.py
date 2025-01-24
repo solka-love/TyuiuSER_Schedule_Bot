@@ -1,7 +1,7 @@
-from datetime import time
-from sqlalchemy import String, Integer, ForeignKey, Time
+from sqlalchemy import String, Integer, ForeignKey
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy import Column
+from datetime import time
 
 # Базовый класс
 class Base(DeclarativeBase):
@@ -17,15 +17,14 @@ class Student(Base):
     full_name = Column(String(200), nullable=False)
     student_tag = Column(String(32))
     coins = Column(Integer, default=0)
+    id_group: Mapped[int] = mapped_column(ForeignKey("s_group.id"), nullable=True)
 
-    # Связь с занятиями (если вам нужно будет получить занятия для студента)
-    lessons = relationship("Lesson", back_populates="student")
-    groups = relationship("StudyGroup", secondary="student_group", back_populates="students")
+    # Связь с группой (через промежуточную таблицу)
+    group = relationship("StudyGroup", back_populates="students", uselist=False)  # Отношение к одной группе
 
     def __repr__(self):
         return f"<Student(user_id={self.user_id}, username={self.username}, full_name={self.full_name})>"
 
-    # Метод для обновления информации о студенте
     def update_profile(self, full_name=None, student_tag=None, coins=None):
         if full_name:
             self.full_name = full_name
@@ -40,40 +39,29 @@ class Lesson(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     cabinet: Mapped[str] = mapped_column(String(30))
-    start_time: Mapped[time]  # Используем time из стандартной библиотеки Python
-    end_time: Mapped[time]    # Используем time из стандартной библиотеки Python
+    start_time: Mapped[time]  # Используем SQLAlchemy Time для работы с временем
+    end_time: Mapped[time]    # Используем SQLAlchemy Time для работы с временем
     w_day: Mapped[int] = mapped_column(ForeignKey("w_days.id"))
     group_id: Mapped[int] = mapped_column(ForeignKey("s_group.id"))
 
-    # Связь с учебной группой (StudyGroup)
+    # Связь с группой
     group = relationship("StudyGroup", back_populates="lessons")
 
-    # Связь с днями недели (WeekDays)
+    # Связь с днями недели
     week_day = relationship("WeekDays", back_populates="lessons")
-    student = relationship("Student", back_populates="lessons")
 
 # Модель учебной группы
 class StudyGroup(Base):
     __tablename__ = "s_group"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    group_name: Mapped[str] = mapped_column(String(10))
+    group_name: Mapped[str] = mapped_column(String(20))
 
     # Связь с занятиями
     lessons = relationship("Lesson", back_populates="group")
 
     # Связь с группой студентов
-    students = relationship("Student", secondary="student_group", back_populates="groups") 
-
-# Модель студентов в группе
-class GroupStudents(Base):
-    __tablename__ = "student_group"
-
-    id_group: Mapped[int] = mapped_column(ForeignKey("s_group.id"))
-    id_student: Mapped[int] = mapped_column(ForeignKey("student.id"))
-
-    student = relationship("Student", back_populates="groups")
-    group = relationship("StudyGroup", back_populates="students")
+    students = relationship("Student", back_populates="group")  # Отношение к студентам
 
 # Модель дней недели
 class WeekDays(Base):

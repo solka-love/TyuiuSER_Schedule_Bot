@@ -23,7 +23,7 @@ async def profile_command(message: types.Message):
     user_id = message.from_user.id
 
     # Получаем профиль пользователя из базы данных
-    student_profile = session.query(Student).filter_by(user_id=user_id).first()
+    student_profile = session.query(Student).join(StudyGroup, StudyGroup.id == Student.id_group).filter(Student.user_id == user_id).first()
 
     if student_profile:
         # Отправляем информацию о пользователе
@@ -32,15 +32,33 @@ async def profile_command(message: types.Message):
             f"Имя: {student_profile.full_name}\n"
             f"Username: {student_profile.username}\n"
             f"ID: {student_profile.user_id}\n"
-            f"Ширкоины: {student_profile.coins}"
+            f"Ширкоины: {student_profile.coins}\n"
+            f"Группа: {student_profile.group.group_name}"  # Выводим название группы
         )
-        # await message.reply(text, reply_markup=get_profile_edit_keyboard())
         await message.reply(text)
     else:
         # Если профиль не зарегистрирован, предлагаем зарегистрироваться
         await message.reply("Профиль не найден. Для регистрации используйте команду /register.")
     
     session.close()
+
+
+
+# Клавиатура для выбора группы
+def get_group_keyboard():
+    keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
+    session = get_session()
+    groups = session.query(StudyGroup).all()
+    
+    # Добавляем кнопку для каждой группы
+    for group in groups:
+        keyboard.add(KeyboardButton(group.group_name))
+    
+    # Кнопка для отмены
+    keyboard.add(KeyboardButton("Отменить"))
+    
+    session.close()
+    return keyboard
 
 # Клавиатура для редактирования профиля
 def get_profile_edit_keyboard():
@@ -74,7 +92,10 @@ async def register_command(message: types.Message):
         session.commit()
 
         await message.reply(f"Ваш профиль успешно зарегистрирован!\nИмя: {full_name}\nUsername: {username}")
-    
+        
+        # Запрос на выбор группы
+        await message.reply("Пожалуйста, выберите вашу группу:", reply_markup=get_group_keyboard())
+
     session.close()
 
 # Хендлер для редактирования профиля
@@ -131,6 +152,30 @@ async def process_edit_tag(message: types.Message):
         await message.answer(f"Ваш тег успешно обновлен на: {new_tag}", reply_markup=get_profile_edit_keyboard())
     session.close()
 
+# Хендлер для выбора группы
+async def process_group_selection(message: types.Message):
+    session = get_session()
+    user_id = message.from_user.id
+    group_name = message.text
+
+    # Проверяем, существует ли группа с таким названием
+    group = session.query(StudyGroup).filter_by(group_name=group_name).first()
+
+    if group:
+        # Получаем профиль студента
+        student_profile = session.query(Student).filter_by(user_id=user_id).first()
+        if student_profile:
+            # Обновляем группу у студента
+            student_profile.id_group = group.id
+            session.commit()
+            await message.reply(f"Ваша группа успешно обновлена на: {group_name}")
+        else:
+            await message.reply("Не удалось найти ваш профиль.")
+    else:
+        await message.reply(f"Группа с названием '{group_name}' не найдена. Попробуйте выбрать другую группу.")
+    
+    session.close()
+
 # Обработчик для изменения ширкоинов
 async def process_edit_coins(message: types.Message):
     try:
@@ -147,35 +192,53 @@ async def process_edit_coins(message: types.Message):
     except ValueError:
         await message.answer("Пожалуйста, введите корректное количество ширкоинов.")
 
+# Хендлер для команды /schedule
 async def schedule_command(message: types.Message):
-    args = message.text.split(maxsplit=1)
-    if len(args) < 2:
-        await message.reply("Пожалуйста, укажите ФИО студента.\nПример: /schedule Иванов Иван Иванович")
-        return
-
-    student_name = args[1]
+    user_id = message.from_user.id
     session = get_session()
-    try:
+
+    # Проверяем, зарегистрирован ли студент по user_id
+    student = session.query(Student).filter(Student.user_id == user_id).first()
+
+    if student:
+        # Если студент зарегистрирован, используем его группу для получения расписания
+        student_name = student.full_name  # Используем ФИО студента из его профиля
+
+        # Получаем расписание для группы студента
+        if not student.id_group:
+            await message.reply(f"У студента {student_name} не указана группа. Пожалуйста, укажите группу в профиле.")
+            return
+        
         lessons = (
             session.query(Lesson, WeekDays)
             .join(WeekDays, Lesson.w_day == WeekDays.id)
-            .join(StudyGroup, Lesson.group_id == StudyGroup.id)
-            .join(Student, Student.id == Lesson.group_id)
-            .filter(Student.full_name == student_name)
+            .filter(Lesson.group_id == student.id_group)  # Используем group_id для фильтрации
             .all()
         )
 
         if not lessons:
-            await message.reply(f"Расписание для {student_name} не найдено.")
+            await message.reply(f"Расписание для группы студента {student_name} не найдено.")
             return
 
-        schedule_text = "\n\n".join(
-            f"{lesson[1].day_name}\nВремя: {lesson[0].start_time} - {lesson[0].end_time}\nКабинет: {lesson[0].cabinet}"
-            for lesson in lessons
-        )
-        await message.reply(f"Расписание для {student_name}:\n\n{schedule_text}")
+        # Группировка уроков по дням недели
+        days_of_week = {day.day_name: [] for day in session.query(WeekDays).all()}  # Словарь для хранения уроков по дням недели
+        
+        # Добавляем уроки в соответствующие дни недели
+        for lesson, week_day in lessons:
+            days_of_week[week_day.day_name].append(f"Время: {lesson.start_time} - {lesson.end_time}\nКабинет: {lesson.cabinet}")
+        
+        # Формируем расписание
+        schedule_text = []
+        for day_name, lessons_list in days_of_week.items():
+            if lessons_list:  # Если есть уроки в этот день
+                schedule_text.append(f"{day_name}:\n" + "\n".join(lessons_list))
 
-    except Exception as e:
-        await message.reply(f"Произошла ошибка: {e}")
-    finally:
-        session.close()
+        if schedule_text:
+            await message.reply(f"Расписание для {student_name}:\n\n" + "\n\n".join(schedule_text))
+        else:
+            await message.reply(f"Для {student_name} не найдено уроков.")
+    else:
+        # Если студент не зарегистрирован, запрашиваем ФИО
+        await message.reply("Пожалуйста, зарегистрируйтесь, указав ваше ФИО с помощью команды /register.")
+    
+    session.close()

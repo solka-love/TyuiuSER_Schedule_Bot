@@ -1,8 +1,8 @@
 from aiogram import types
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, WebAppInfo
 from sqlalchemy.orm import Session
 from database import get_session
-from models import Student, Lesson, WeekDays, StudyGroup
+from models import Student, Lesson, WeekDays, StudyGroup, Users
 
 # Хендлер для команды /start
 async def start_command(message: types.Message):
@@ -68,6 +68,19 @@ def get_profile_edit_keyboard():
     keyboard.add(KeyboardButton("Изменить ширкоины"))
     keyboard.add(KeyboardButton("Назад"))
     return keyboard
+
+async def create_user(message: types.Message):
+    session = get_session()
+    username = message.from_user.username
+    if not username:
+        await message.reply("У вас не установлен username. Пожалуйста, установите его в настройках Telegram.")
+        return
+    existing_profile = session.query(Users).filter_by(username = username).first()
+
+    if existing_profile:
+        await message.reply("Такой профиль уже есть :(")
+    else:
+        await message.answer("Введите пароль для вашего аккаунта:")
 
 # Хендлер для команды /register (регистрация профиля)
 async def register_command(message: types.Message):
@@ -242,3 +255,20 @@ async def schedule_command(message: types.Message):
         await message.reply("Пожалуйста, зарегистрируйтесь, указав ваше ФИО с помощью команды /register.")
     
     session.close()
+
+
+async def admin_command(message: types.Message):
+    await message.answer("Введите пароль для доступа к админ панели")
+
+async def process_admin_password(message: types.Message):
+    correct_password = "3721696"
+    if message.text == correct_password:
+        keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
+        web_app_button = KeyboardButton(
+            text="Open",
+            web_app=WebAppInfo(url="vk.ru")
+        )
+        keyboard.add(web_app_button)
+        await message.answer("Accsess")
+    else:
+        await message.answer("error")

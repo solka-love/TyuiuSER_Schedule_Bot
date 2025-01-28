@@ -2,6 +2,7 @@ from sqlalchemy import String, Integer, ForeignKey
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy import Column
 from datetime import time
+from hash import check_password, generate_password_hash
 
 # Базовый класс
 class Base(DeclarativeBase):
@@ -72,3 +73,28 @@ class WeekDays(Base):
 
     # Связь с занятиями
     lessons = relationship("Lesson", back_populates="week_day")
+
+
+class Users(Base):
+    __tablename__="users"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    username: Mapped[str] = mapped_column(String(30))
+    password_hash: Mapped[str] = mapped_column(String(128))
+    role_id: Mapped[int] = mapped_column(ForeignKey("role.id"))
+
+    
+    role = relationship("Role", back_populates="users")
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password(self.password_hash, password)
+
+class Role(Base):
+    __tablename__ = "role"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(30))
+
+    user = relationship("User", back_populates="role")
